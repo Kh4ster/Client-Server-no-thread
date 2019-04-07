@@ -89,11 +89,11 @@ void handleGame(SalonDeJeu *salonDeJeu)
 	{
 		writeToClient(salonDeJeu->sockets[salonDeJeu->indiceJoueur], getFormatedMatrix(salonDeJeu, buffer), buffer); //On donne l'état de la matrice au ième joueur
 		
-		read(salonDeJeu->sockets[salonDeJeu->indiceJoueur], coordonnees, sizeof(coordonnees));												//On lit ce qu'il a envoyé
+		read(salonDeJeu->sockets[salonDeJeu->indiceJoueur], coordonnees, sizeof(coordonnees));	//On lie les coordonnées envoyés par le client												//On lit ce qu'il a envoyé
 
-		salonDeJeu->matrix.matrix[coordonnees[1]][coordonnees[0]] = joueurActuel;
+		salonDeJeu->matrix.matrix[coordonnees[1]][coordonnees[0]] = joueurActuel;	//On indique dans la matrice la lettre mis par le joueur
 
-		salonDeJeu->indiceJoueur = (salonDeJeu->indiceJoueur + 1) % 2;
+		salonDeJeu->indiceJoueur = (salonDeJeu->indiceJoueur + 1) % 2;	//On incrémente et %2 pour alterner 0 1
 
 		joueurActuel = (salonDeJeu->indiceJoueur == 1) ? 'O' : 'X';						//Si c'est au joueur 1, le lettre est maintenant O sinon X
 	}
@@ -132,7 +132,7 @@ void waitingRoom(SalonDeJeu *salonsDeJeu)
 		*	Ici on attend que un processus de lobby nous envoie une socket pour jouer
 		*	Ici le read est bloquant
 		*/
-		read(salonsDeJeu->pipeReadFromLobby, salonsDeJeu->sockets[salonsDeJeu->nbJoueur], sizeof(int));	
+		read(salonsDeJeu->pipeReadFromLobby, &salonsDeJeu->sockets[salonsDeJeu->nbJoueur], sizeof(int));	
 		
 		//Une fois qu'on a recu un nouveau joueur on incrémente le nombre de joueur par 1
 
@@ -146,22 +146,23 @@ void waitingRoom(SalonDeJeu *salonsDeJeu)
 	handleGame(salonsDeJeu);	//Une fois qu'on a nos 2 joueurs/sockets la partie peu commencer 
 }
 
-void handleLobby(SalonDeJeu *salonsDeJeu, int tubesWriteSocket[lobbySize][2], int socketTalk)
+void handleLobby(SalonDeJeu *salonsDeJeu, int tubesWriteSocket[lobbySize][2], int socketTalk)	//Ici les clients choissient leur salon
 {
 
 	char buffer[LG_MESSAGE]; 
-	int messageRecu = 0;	
+	int salonChoisi = 0;	
 
 	do
 	{
-		writeToClient(socketTalk, getSalonInfo(salonsDeJeu), buffer);
-		read(socketTalk, messageRecu, sizeof(messageRecu));		
+		writeToClient(socketTalk, getSalonInfo(salonsDeJeu), buffer);	//On lui donne l'état actuel des salons
 
-	}while(testRoom(salonsDeJeu, messageRecu) == -1);
+		read(socketTalk, &salonChoisi, sizeof(salonChoisi));		//On lit quel salon il a choisi
+
+	}while(testRoom(salonsDeJeu, salonChoisi) == -1);
 	
-	salonsDeJeu[messageRecu].nbJoueur += 1;	//On incrémente de 1 le nombre de joueur
+	salonsDeJeu[salonChoisi].nbJoueur += 1;	//On incrémente de 1 le nombre de joueur il a choisi
 
-	write(tubesWriteSocket[messageRecu][1], socketTalk, sizeof(int));	//On indique au salon de jeu qu'on a un nouveau client pour client
+	write(tubesWriteSocket[salonChoisi][1], &socketTalk, sizeof(int));	//On indique au salon de jeu qu'on a un nouveau client pour client
 
 	/*
 	*	Le processus fils a fini son travail de traitement avec le client et a passé la socket au salon de jeu
