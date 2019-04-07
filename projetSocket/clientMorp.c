@@ -11,20 +11,23 @@
 
 int main()
 {
-	int descripteurSocket;
+	/* Partie d'initialisation peu intéressante
+	* Aller directement à la partie traitement
+	*/
+
+	int socket;
 	struct sockaddr_in pointDeRencontreDistant;
 	socklen_t longueurAdresse;
 	char messageRecu[LG_MESSAGE]; /* le message de la couche Application ! */
 	// Crée un socket de communication
-	descripteurSocket = socket(PF_INET, SOCK_STREAM, 0); /* 0 indique que l’on utilisera le
+	socket = socket(PF_INET, SOCK_STREAM, 0); /* 0 indique que l’on utilisera le
 	protocole par défaut associé à SOCK_STREAM soit TCP */
 	//Teste la valeurrenvoyée parl’appel système socket()
-	if (descripteurSocket < 0)
+	if (socket < 0)
 	{					  /* échec ? */
 		perror("socket"); // Affiche le message d’erreur
 		exit(-1);		  // On sort en indiquant un code erreur
 	}
-	printf("Socket créée avec succès !(%d)\n", descripteurSocket);
 	// Obtient la longueur en octets de la structure sockaddr_in
 	longueurAdresse = sizeof(pointDeRencontreDistant);
 	// Initialise à 0 la structure sockaddr_in
@@ -36,11 +39,10 @@ int main()
 	// On choisit l’adresse IPv4 du serveur
 	inet_aton("0.0.0.0", &pointDeRencontreDistant.sin_addr); // à modifier selon ses besoins
 	// Débute la connexion vers le processus serveur distant
-	if ((connect(descripteurSocket, (struct sockaddr *)&pointDeRencontreDistant,
-				 longueurAdresse)) == -1)
+	if ((connect(socket, (struct sockaddr *)&pointDeRencontreDistant, longueurAdresse)) == -1)
 	{
 		perror("connect");		  // Affiche le message d’erreur
-		close(descripteurSocket); // On ferme la ressource avant de quitter
+		close(socket); // On ferme la ressource avant de quitter
 		exit(-2);				  // On sort en indiquant un code erreur
 	}
 	printf("Connexion au serveur réussie avec succès !\n");
@@ -49,16 +51,19 @@ int main()
 	memset(messageRecu, 0x00, LG_MESSAGE * sizeof(char));
 	// Envoie un message au serveur
 
-	read(descripteurSocket, messageRecu, LG_MESSAGE * sizeof(char));
+	/* /Partie init */
+
+	/* ----- Traitement ----- */
+
+	read(socket, messageRecu, LG_MESSAGE * sizeof(char));
 
 	printf("%s", messageRecu);
 
 	int xy[2];
 	scanf("%d %d", &xy[0], &xy[1]);
 
-	write(descripteurSocket, xy, sizeof(xy));
-	//--- Fin de l’étape n°4 !
-	// On ferme la ressource avant de quitter
-	close(descripteurSocket);
+	write(socket, xy, sizeof(xy));
+
+	close(socket);
 	return 0;
 }

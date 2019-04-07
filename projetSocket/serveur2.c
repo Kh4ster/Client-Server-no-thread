@@ -28,28 +28,27 @@ typedef struct{
 
 	int nbJoueur;
 	Matrix matrix;
-	char indiceJoueur;
+	int indiceJoueur;
 	int sockets[2];
 	int pipeWriteToMainProc;
 	int pipeReadFromLobby;
 
 }SalonDeJeu;
 
-char* getFormatedMatrix(char matrix[3][3])
+char* getFormatedMatrix(SalonDeJeu *salonDeJeu, char *buffer)
 {
-	char *string = malloc(100);
-	string[0] = 0;
-	strcat(string, "Etat du morpion :\n");
-	int curr = strlen(string);
+	buffer[0] = 0;
+	strcat(buffer, "Etat du morpion :\n");
+	int curr = strlen(buffer);
 	for(int i = 0; i < 3; ++i)
 	{
 		for(int j = 0; j < 3; ++j)
-			string[curr++] = matrix[i][j];
-		string[curr++] = '\n';
+			buffer[curr++] = salonDeJeu->matrix.matrix[i][j];
+		buffer[curr++] = '\n';
 	}
-	string[strlen(string)] = 0;
-	strcat(string, "Entrez la case au format x y\n");
-	return string;
+	buffer[strlen(buffer)] = 0;
+	strcat(buffer, "Entrez la case au format x y\n");
+	return buffer;
 }
 
 void fillMatrix(char matrix[3][3])
@@ -64,21 +63,41 @@ void handlePipeError(int pipeError)
 	if(pipeError == -1){perror("pipe"); exit(-1);}
 }
 
+void writeToClient(int socketTalk, char *message, char *buffer){
+	sprintf(buffer, "%s", message);
+	write(socketTalk, buffer, strlen(buffer));
+}
+
+int gameNotOver(SalonDeJeu *salonDeJeu)	//To Code
+{
+	return 1;
+}
+
 void handleGame(SalonDeJeu *salonDeJeu)
 {
-	/*char messageEnvoi[LG_MESSAGE]; 
-	int coordonnees[2];
-	int pipeError = pipe(salonDeJeu->pipe);
-	handlePipeError(pipeError);
+	char buffer[LG_MESSAGE];	//buffer pour lire et écrire
 
-	sprintf(messageEnvoi, getFormatedMatrix(matrix));
-	write(socketTalk, messageEnvoi, strlen(messageEnvoi));
+	int coordonnees[2];	//Tableau dans lequel on va ranger les coordonnées reçues
 
-
-	read(socketTalk, coordonnees, sizeof(coordonnees));	
-	salonDeJeu->matrix[messageRecu[1]][messageRecu[0]] = salonDeJeu->indiceJoueur;
+	char joueurActuel = 'X';
 	
-	salonDeJeu->indiceJoueur = (salonDeJeu->indiceJoueur == 'X') ? 'O' : 'X';	//Si c'était X O, si c'était O X*/
+	writeToClient(salonDeJeu->sockets[1], "wait", buffer);	//On indique au deuxième client qu'il doit attendre
+
+	writeToClient(salonDeJeu->sockets[0], "play", buffer);	//On indique au premier client qu'il peut jouer
+
+	while(gameNotOver(salonDeJeu))
+	{
+		writeToClient(salonDeJeu->sockets[salonDeJeu->indiceJoueur], getFormatedMatrix(salonDeJeu, buffer), buffer); //On donne l'état de la matrice au ième joueur
+		
+		read(salonDeJeu->sockets[salonDeJeu->indiceJoueur], coordonnees, sizeof(coordonnees));												//On lit ce qu'il a envoyé
+
+		salonDeJeu->matrix.matrix[coordonnees[1]][coordonnees[0]] = joueurActuel;
+
+		salonDeJeu->indiceJoueur = (salonDeJeu->indiceJoueur + 1) % 2;
+
+		joueurActuel = (salonDeJeu->indiceJoueur == 1) ? 'O' : 'X';						//Si c'est au joueur 1, le lettre est maintenant O sinon X
+	}
+
 }
 
 char *getSalonInfo(SalonDeJeu *salonsDeJeu)
@@ -121,7 +140,7 @@ void waitingRoom(SalonDeJeu *salonsDeJeu)
 
 		//Une signal ensuite on processus père qu'on a un nouveau nombre de joueur
 
-		write(salonsDeJeu->pipeWriteToMainProc, salonsDeJeu->nbJoueur, sizeof(int));	
+		write(salonsDeJeu->pipeWriteToMainProc, &salonsDeJeu->nbJoueur, sizeof(int));	
 	}
 	
 	handleGame(salonsDeJeu);	//Une fois qu'on a nos 2 joueurs/sockets la partie peu commencer 
@@ -130,13 +149,12 @@ void waitingRoom(SalonDeJeu *salonsDeJeu)
 void handleLobby(SalonDeJeu *salonsDeJeu, int tubesWriteSocket[lobbySize][2], int socketTalk)
 {
 
-	char messageEnvoi[LG_MESSAGE]; 
-	int messageRecu;	
+	char buffer[LG_MESSAGE]; 
+	int messageRecu = 0;	
 
 	do
 	{
-		sprintf(messageEnvoi, getSalonInfo(salonsDeJeu));
-		write(socketTalk, messageEnvoi, strlen(messageEnvoi));	//Ici on communique avec le client pour savoir quelle salon l'intéresse
+		writeToClient(socketTalk, getSalonInfo(salonsDeJeu), buffer);
 		read(socketTalk, messageRecu, sizeof(messageRecu));		
 
 	}while(testRoom(salonsDeJeu, messageRecu) == -1);
@@ -179,7 +197,7 @@ void initSalonsDeJeu(SalonDeJeu *salonsDeJeu, int tubesReadInfo[lobbySize][2], i
 	for(int i = 0; i < lobbySize; ++i)		//On initaliser les salons de jeu et on les lances
 	{
 		salonsDeJeu[i].nbJoueur = 0;
-		salonsDeJeu[i].indiceJoueur = 'X';
+		salonsDeJeu[i].indiceJoueur = 0;
 		salonsDeJeu[i].pipeWriteToMainProc = tubesReadInfo[i][1];			//On lui passe ce bout de la pipe pour qu'il donne ses infos sur ses états
 		salonsDeJeu[i].pipeReadFromLobby = tubesWriteSocket[i][0];			//On lui passe ce bout de la pipe pour qu'il puisse récupérer des joueurs
 		
