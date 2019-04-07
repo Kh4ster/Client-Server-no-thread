@@ -1,0 +1,4 @@
+quand parti fini faut le dire au main
+virer les printf de test
+problèema affichgage depasse 9 dans lobby
+si read sensé être bloquant pas bloquant et du coup je fais ma bidouille, retiré commentaire dans waiting room

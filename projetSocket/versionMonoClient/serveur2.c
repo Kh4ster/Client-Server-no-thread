@@ -112,7 +112,7 @@ char *getSalonInfo(SalonDeJeu *salonsDeJeu)
 	for(int i = 0; i < lobbySize; ++i){
 		str[index++] = i + '0'; //Write the number as a character in the string
 		str[index++] = ' ';		//A space
-		str[index++] = salonsDeJeu[i].nbJoueur + '0'; 	//And the value of the lobby
+		str[index++] = salonsDeJeu->nbJoueur + '0'; 	//And the value of the lobby
 		str[index++] = '\n';
 	}
 	str[index] = 0;	//We put the end character to be able to use strcat again
@@ -122,7 +122,7 @@ char *getSalonInfo(SalonDeJeu *salonsDeJeu)
 
 int testRoom(SalonDeJeu *salonsDeJeu, int choix)
 {
-	if(choix < 0 || choix >= lobbySize || salonsDeJeu[choix].nbJoueur == 2)
+	if(choix < 0 || choix >= lobbySize || salonsDeJeu->nbJoueur == 2)
 		return -1;
 	return 1;
 }
@@ -196,21 +196,15 @@ void handleForkError(int pid)
 void inittubesReadInfo(int tubesReadInfo[lobbySize][2])
 {
 	int error = 0;
-	for(int i = 0; i < lobbySize; ++i)		//Ici les pipes de lecture sont configurés en non bloquant pour que le processus principal puisse lire en permanance
-	{
-		error = pipe2(tubesReadInfo[i], O_NONBLOCK);
-		handlePipeError(error);
-	}
+	error = pipe2(tubesReadInfo, O_NONBLOCK);
+	handlePipeError(error);
 }
 
-void inittubesWriteSocket(Pipe tubesWriteSocket[lobbySize])
+void inittubesWriteSocket(int tubesWriteSocket[lobbySize][2])
 {
 	int error = 0;
-	for(int i = 0; i < lobbySize; ++i)		//Ici les pipes sont configurés normalement
-	{
-		error = pipe(tubesWriteSocket[i].pipe);
-		handlePipeError(error);
-	}
+	error = pipe(tubesWriteSocket);
+	handlePipeError(error);
 }
 */
 void initSalonsDeJeu(SalonDeJeu *salonsDeJeu, int tubesReadInfo[lobbySize][2], int tubesWriteSocket[lobbySize][2])
@@ -223,17 +217,16 @@ void initSalonsDeJeu(SalonDeJeu *salonsDeJeu, int tubesReadInfo[lobbySize][2], i
 		salonsDeJeu[i].sockets[1] = -1;
 		salonsDeJeu[i].pipeWriteToMainProc = tubesReadInfo[i][1];			//On lui passe ce bout de la pipe pour qu'il donne ses infos sur ses états
 		salonsDeJeu[i].pipeReadFromLobby = tubesWriteSocket[i][0];			//On lui passe ce bout de la pipe pour qu'il puisse récupérer des joueurs
-		int error;
-		if( (error = fork()) == 0)
+		
+		if(fork() == 0)
 		{
-			handleForkError(error);
 			/*close(tubesReadInfo[i][0]);			//Le père ferme le côté écriture de son côté
 			close(tubesWriteSocket[i][0]);		//Et le côté lecture socket de son côté*/
 			
 			//On envoie le processus et le salon de jeu dans une fonction où il attendra des joueurs et lancera des parties
 			waitingRoom(&salonsDeJeu[i]);
 		}
-		
+
 		/*close(tubesReadInfo[i][1]);			//Le père ferme le côté écriture de son côté
 		close(tubesWriteSocket[i][0]);		//Et le côté lecture socket de son côté*/
 
@@ -280,6 +273,7 @@ int main() {
 		perror("listen");
 		exit(-3);
 	}
+	
 	printf("Socket placee en ecoute\n");
 
 
@@ -318,6 +312,7 @@ int main() {
 		error = pipe(tubesWriteSocket[i]);
 		handlePipeError(error);
 	}
+
 	// Une fois les tubes initialisés on va initier les salons et donc les 15 processus
 
 	initSalonsDeJeu(salonsDeJeu, tubesReadInfo, tubesWriteSocket);
@@ -333,8 +328,7 @@ int main() {
 	int state = -1;	//Ici la variable qui acceuillera les retour des read des pipes, déclaré aussi en dehors pour les mêmes raisons
 
 	while(1) {
-
-		for(i = 0 ; i < lobbySize; ++i)
+		for(int i = 0; i < lobbySize; ++i)
 		{
 			read(tubesReadInfo[i][0], &state, sizeof(state));
 			if(state != -1)											//La variable state est toujours maintenu à -1, sa valeur change que si read a pu lire une donnée
@@ -346,6 +340,7 @@ int main() {
 		}
 		
 		socketTalk = accept(socketListen, (struct sockaddr *)&adresseDistante, &longueurAdresse);	//accept renvoie -1 systématiquement quand le buffer de connexion est vide
+		
 
 		if(socketTalk != -1)	//Si un client a été acceuilli
 		{

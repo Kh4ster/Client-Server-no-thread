@@ -1,0 +1,3 @@
+quand marche pas
+-> simplfieir au possible jusqu'à ce que marche puis rajouter jusqu'à ce que plus
+-> tableau bidimensionnel dans fonction bancal
