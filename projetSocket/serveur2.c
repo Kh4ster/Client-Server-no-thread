@@ -37,7 +37,6 @@ typedef struct{
 
 char* getFormatedMatrix(SalonDeJeu *salonDeJeu, char *buffer)
 {
-	printf(" ---> état du buffer avant : %s\n", buffer);
 	buffer[0] = 0;
 	strcat(buffer, "Etat du morpion :\n");
 	int curr = strlen(buffer);
@@ -49,7 +48,6 @@ char* getFormatedMatrix(SalonDeJeu *salonDeJeu, char *buffer)
 	}
 	buffer[strlen(buffer)] = 0;
 	strcat(buffer, "Entrez la case au format x y\n");
-	printf(" ---> était du buffer après : %s\n", buffer);
 	return buffer;
 }
 
@@ -77,18 +75,26 @@ int gameNotOver(SalonDeJeu *salonDeJeu)	//To Code
 
 void handleGame(SalonDeJeu *salonDeJeu)
 {
-	char buffer[LG_MESSAGE];	//buffer pour lire et écrire
-	memset(buffer, 0x00, LG_MESSAGE * sizeof(char));
+	char buffer1[LG_MESSAGE];	//buffer pour lire et écrire
+	char buffer2[LG_MESSAGE];	//buffer pour lire et écrire
+	memset(buffer1, 0x00, LG_MESSAGE * sizeof(char));
+	memset(buffer2, 0x00, LG_MESSAGE * sizeof(char));
 
 	int coordonnees[2];	//Tableau dans lequel on va ranger les coordonnées reçues
 
 	char joueurActuel = 'X';
 	
-	writeToClient(salonDeJeu->sockets[1], "wait", buffer);	//On indique au deuxième client qu'il doit attendre
+	writeToClient(salonDeJeu->sockets[1], "wait", buffer1);	//On indique au deuxième client qu'il doit attendre
 
-	writeToClient(salonDeJeu->sockets[0], "play", buffer);	//On indique au premier client qu'il peut jouer
+	writeToClient(salonDeJeu->sockets[0], "play", buffer2);	//On indique au premier client qu'il peut jouer
 
-	while(gameNotOver(salonDeJeu))
+	printf("Message envoyé au deux\n");
+
+	while(1){
+
+	}
+
+	/*while(gameNotOver(salonDeJeu))
 	{
 		writeToClient(salonDeJeu->sockets[salonDeJeu->indiceJoueur], getFormatedMatrix(salonDeJeu, buffer), buffer); //On donne l'état de la matrice au ième joueur
 		
@@ -99,7 +105,7 @@ void handleGame(SalonDeJeu *salonDeJeu)
 		salonDeJeu->indiceJoueur = (salonDeJeu->indiceJoueur + 1) % 2;	//On incrémente et %2 pour alterner 0 1
 
 		joueurActuel = (salonDeJeu->indiceJoueur == 1) ? 'O' : 'X';						//Si c'est au joueur 1, le lettre est maintenant O sinon X
-	}
+	}*/
 
 }
 
@@ -129,35 +135,33 @@ int testRoom(SalonDeJeu *salonsDeJeu, int choix)
 
 void waitingRoom(SalonDeJeu *salonsDeJeu)
 {
-	printf(" ---> J'attends\n");
+
 	while(salonsDeJeu->nbJoueur < 2)	//Tant qu'il n'y a pas 2 joueur on attent
 	{
 		/* 
 		*	Ici on attend que un processus de lobby nous envoie une socket pour jouer
 		*	Ici le read est bloquant
 		*/
-		do{
 
-			read(salonsDeJeu->pipeReadFromLobby, &salonsDeJeu->sockets[salonsDeJeu->nbJoueur], sizeof(int));
+		read(salonsDeJeu->pipeReadFromLobby, &salonsDeJeu->sockets[salonsDeJeu->nbJoueur], sizeof(int));
 
-		}while(salonsDeJeu->sockets[salonsDeJeu->nbJoueur] == -1);
-
-		printf("Ce que j'ai lu : %d\n", salonsDeJeu->sockets[salonsDeJeu->nbJoueur]);
 		//Une fois qu'on a recu un nouveau joueur on incrémente le nombre de joueur par 1
 
 		salonsDeJeu->nbJoueur += 1;
 
-		//Une signal ensuite on processus père qu'on a un nouveau nombre de joueur
+		//On signal ensuite on processus père qu'on a un nouveau nombre de joueur
 
-		write(salonsDeJeu->pipeWriteToMainProc, &salonsDeJeu->nbJoueur, sizeof(int));	
+		write(salonsDeJeu->pipeWriteToMainProc, &salonsDeJeu->nbJoueur, sizeof(int));
+
 	}
-	
+
+	printf("Les deux joueurs sont là, c'est partie !\n");
+
 	handleGame(salonsDeJeu);	//Une fois qu'on a nos 2 joueurs/sockets la partie peu commencer 
 }
 
 void handleLobby(SalonDeJeu *salonsDeJeu, int tubesWriteSocket[lobbySize][2], int socketTalk)	//Ici les clients choissient leur salon
 {
-	printf("ENTER IN HANDLE LOBBY\n");
 	char buffer[LG_MESSAGE]; 
 	memset(buffer, 0x00, LG_MESSAGE * sizeof(char));
 	int salonChoisi = 0;	
@@ -170,7 +174,9 @@ void handleLobby(SalonDeJeu *salonsDeJeu, int tubesWriteSocket[lobbySize][2], in
 
 	}while(testRoom(salonsDeJeu, salonChoisi) == -1);
 
-	printf("Il a fait son choix\n");
+	//On dit on joueur que sa sélection est bonne et qu'il est bien dans le salon
+
+	writeToClient(socketTalk, "ok", buffer);
 	
 	salonsDeJeu[salonChoisi].nbJoueur += 1;	//On incrémente de 1 le nombre de joueur il a choisi
 
@@ -192,27 +198,7 @@ void handleForkError(int pid)
 		exit(-1);
 	}
 }
-/*
-void inittubesReadInfo(int tubesReadInfo[lobbySize][2])
-{
-	int error = 0;
-	for(int i = 0; i < lobbySize; ++i)		//Ici les pipes de lecture sont configurés en non bloquant pour que le processus principal puisse lire en permanance
-	{
-		error = pipe2(tubesReadInfo[i], O_NONBLOCK);
-		handlePipeError(error);
-	}
-}
 
-void inittubesWriteSocket(Pipe tubesWriteSocket[lobbySize])
-{
-	int error = 0;
-	for(int i = 0; i < lobbySize; ++i)		//Ici les pipes sont configurés normalement
-	{
-		error = pipe(tubesWriteSocket[i].pipe);
-		handlePipeError(error);
-	}
-}
-*/
 void initSalonsDeJeu(SalonDeJeu *salonsDeJeu, int tubesReadInfo[lobbySize][2], int tubesWriteSocket[lobbySize][2])
 {
 	for(int i = 0; i < lobbySize; ++i)		//On initaliser les salons de jeu et on les lances
@@ -306,16 +292,17 @@ int main() {
 	int tubesReadInfo[lobbySize][2];	//Ce tableau sera utilisé pour actualiser les infos des salons de jeu en gardant un lien avec les processus de salons
 	int tubesWriteSocket[lobbySize][2];	//Ce tableau sera utilisé pour faire entrer les clients dans les salons de jeu
 
-	//inittubesReadInfo(tubesReadInfo);
-
-	//inittubesWriteSocket(tubesWriteSocket);
+	/*
+	 *	Pour une raison que j'ignore quand je fais l'initialisation via une fonction
+	 *  Les pipes ne fonctionnent pas
+	*/ 
 
 	int error = 0;
 	for(int i = 0; i < lobbySize; ++i)
 	{
-		error = pipe2(tubesReadInfo[i], O_NONBLOCK);
+		error = pipe2(tubesReadInfo[i], O_NONBLOCK);	//Cette pipe là est non boquante
 		handlePipeError(error);
-		error = pipe(tubesWriteSocket[i]);
+		error = pipe(tubesWriteSocket[i]);				//Celle là est bloquante
 		handlePipeError(error);
 	}
 	// Une fois les tubes initialisés on va initier les salons et donc les 15 processus

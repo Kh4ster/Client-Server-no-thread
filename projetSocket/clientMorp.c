@@ -10,34 +10,61 @@
 
 #define LG_MESSAGE 256
 
-void startGame(){
+/*
+On se passe les buffer de fonction en fonction pour réduire le coût mémoire
+*/
+
+void startGame(int socket, char *buffer){
 	
-	/*read(socket, buffer, LG_MESSAGE * sizeof(char));
+	read(socket, buffer, LG_MESSAGE * sizeof(char));	//read est bloquant donc on attend là de savoir qui commence
 
-	printf("%s", buffer);
+	printf("La partie commence !\n");
 
-	int xy[2];
-	scanf("%d %d", &xy[0], &xy[1]);
+	int coordonnees[2];
 
-	write(socket, xy, sizeof(xy));*/
+	while(strcmp(buffer, "fini") != 0)	//Tant qu'on a pas reçu fini on doit choisi un salon
+	{
+		if(strcmp(buffer, "play") == 0)
+		{
+			printf("%s", buffer);								//On affiche l'état du morpion
+			scanf("%d %d", &coordonnees[0], &coordonnees[1]);
+			write(socket, coordonnees, sizeof(coordonnees));	//On envoie au serveur notre choix
+		}
+		else
+		{
+			printf("L'autre joueur joue...\n");
+		}
+		
+
+		//Sinon ça veut dire qu'on a reçu wait, l'autre joueur joue
+
+		memset(buffer, 0x00, LG_MESSAGE * sizeof(char));
+		read(socket, buffer, LG_MESSAGE * sizeof(char));
+	}
+
+
 }
 
 void chooseLobby(int socket, char *buffer){
 
-	read(socket, buffer, LG_MESSAGE * sizeof(char));
-
 	int choice;
 
-	while(strcmp(buffer, "wait") != 0 || strcmp(buffer, "play") != 0 )	//Tant qu'on a pas reçu wait ou play on doit choisi un salon
+	read(socket, buffer, LG_MESSAGE * sizeof(char));
+
+	while(strcmp(buffer, "ok") != 0)	//Tant qu'on a pas reçu le message on doit choisi un salon
 	{
-		printf("%s", buffer);	//On affihe l'état des salons de jeu
+		printf("%s", buffer);	//On affiche l'état des salons de jeu
+		memset(buffer, 0x00, LG_MESSAGE * sizeof(char));	//On clear le buffer à chaque fois de l'ancien message
 		scanf("%d", &choice);
 		write(socket, &choice, sizeof(int));	//On envoie au serveur notre choix
+		read(socket, buffer, LG_MESSAGE * sizeof(char));
 	}
 
-	printf("ok !");
+	printf("En attente du deuxième joueur\n");
 
-	exit(-1);
+	memset(buffer, 0x00, LG_MESSAGE * sizeof(char));
+
+	startGame(socket, buffer);
 
 }
 
