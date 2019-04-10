@@ -18,7 +18,7 @@
 
 #define PORT IPPORT_USERRESERVED // = 5000
 #define LG_MESSAGE 256
-#define lobbySize 1
+#define lobbySize 10
 
 /* ---- Logique du morpion  ---- */
 
@@ -39,7 +39,7 @@ char *convertString(char un, char deux, char trois){
 int check(char *ligne, char symbole){
     char *resultatVoulu = convertString(symbole, symbole, symbole); // "XXX" ou "OOO"
 
-    if(strcmp(ligne, resultatVoulu) == 0){
+    if(strcmp(ligne, resultatVoulu) == 0)
         return 1;
     else
         return 0;
@@ -77,7 +77,7 @@ int checkIfWin(char tab[3][3], char symboleJoueur){
 
 // CHECKER SI LES COORDONNEES ENVOYER SONT BIEN A L'INTERIEUR DE LA MATRIX
 int coordIsNotOk(int coordonnees[2]){
-    for(int i=0; i<coordonnees.size(); i++){
+    for(int i = 0; i < 2; i++){
         if(coordonnees[i] < 0 || coordonnees[i] > 2)
             return 1;
     }
@@ -210,7 +210,7 @@ char* getFormatedMatrix(SalonDeJeu *salonDeJeu, char *buffer)
 		buffer[curr++] = '\n';
 	}
 	buffer[strlen(buffer)] = 0;
-	strcat(buffer, "Entrez la case au format x y\n");
+	strcat(buffer, "Entrez la case au format : x y\n");
 	return buffer;
 }
 
@@ -219,6 +219,16 @@ void fillMatrix(char matrix[3][3])
 	for(int i = 0; i < 3; ++i)
 		for(int j = 0; j < 3; ++j)
 			matrix[i][j] = ' ';
+}
+
+
+void initFieldSalon(SalonDeJeu *salonsDeJeu)
+{
+	salonsDeJeu->nbJoueur = 0;
+	salonsDeJeu->indiceJoueur = 0;
+	salonsDeJeu->sockets[0] = -1;
+	salonsDeJeu->sockets[1] = -1;
+	fillMatrix(salonsDeJeu->matrix);
 }
 
 void handlePipeError(int pipeError)
@@ -244,22 +254,22 @@ void handleGame(SalonDeJeu *salonDeJeu)
 
 	writeToClient(salonDeJeu->sockets[1], "wait", buffer1);	//On indique au deuxième client qu'il doit attendre
 
-	while(!checkIfWin(salonDeJeu, joueurActuel))
+	while(!checkIfWin(salonDeJeu->matrix, (joueurActuel == 'X') ? 'O' : 'X'))	//On check ce que le joueur d'avant à joué
 	{
-		writeToClient(salonDeJeu->sockets[salonDeJeu->indiceJoueur], getFormatedMatrix(salonDeJeu, buffer2), buffer2); //On donne l'état de la matrice au ième joueur
+		do // On lis la réponse du client TANT QU'IL N'A PAS ENVOYER DE BONNE COORDONNEES
+		{
+			
+			writeToClient(salonDeJeu->sockets[salonDeJeu->indiceJoueur], getFormatedMatrix(salonDeJeu, buffer2), buffer2); //On donne l'état de la matrice au ième joueur
+			
+			memset(buffer2, 0x00, LG_MESSAGE * sizeof(char));
+			
+			read(salonDeJeu->sockets[salonDeJeu->indiceJoueur], coordonnees, sizeof(coordonnees));	//On lie les coordonnées envoyés par le client
+		
+		}while(coordIsNotOk(coordonnees)); 
 
-		memset(buffer2, 0x00, LG_MESSAGE * sizeof(char));
+        writeToClient(salonDeJeu->sockets[salonDeJeu->indiceJoueur], "okcoord", buffer1);	//On indique au client qu'il a rentré de bonne coordonnée
 
-
-		// GWEN ----------------------
-		do{
-            read(salonDeJeu->sockets[salonDeJeu->indiceJoueur], coordonnees, sizeof(coordonnees));	//On lie les coordonnées envoyés par le client												//On lit ce qu'il a envoyé
-        }while(coordIsNotOk(coordonnees))); // On lis la réponse du client TANT QU'IL N'A PAS ENVOYER DE BONNE COORDONNEES
-
-        writeToClient(salonDeJeu->indiceJoueur, "okcoord", buffer1);	//On indique au client qu'il a rentré de bonne coordonnée
-
-        memset(buffer1, 0x00, LG_MESSAGE * sizeof(char));   // On vide bien
-        // GWEN ----------------------
+        memset(buffer1, 0x00, LG_MESSAGE * sizeof(char));
 
         salonDeJeu->matrix[coordonnees[1]][coordonnees[0]] = joueurActuel;	//On indique dans la matrice la lettre mis par le joueur
 
@@ -267,7 +277,24 @@ void handleGame(SalonDeJeu *salonDeJeu)
 
 		joueurActuel = (salonDeJeu->indiceJoueur == 1) ? 'O' : 'X';						//Si c'est au joueur 1, le lettre est maintenant O sinon X
 	}
-    printf("Le joueur gagnant est : " +joueurActuel);
+
+	memset(buffer1, 0x00, LG_MESSAGE * sizeof(char));
+	memset(buffer2, 0x00, LG_MESSAGE * sizeof(char));
+
+	writeToClient(salonDeJeu->sockets[0], "fini", buffer1);
+
+	writeToClient(salonDeJeu->sockets[1], "fini", buffer2);
+
+	printf("Le joueur %c a gagné !\n", (joueurActuel == 'X') ? 'O' : 'X'); //C'est le dernier à avoir joué qui gagne
+
+	/*On signale au procesus main que ce salon est libre*/
+
+	salonDeJeu->nbJoueur = 0;
+
+	write(salonDeJeu->pipeWriteToMainProc, &salonDeJeu->nbJoueur, sizeof(int));
+
+	//On sort de cette fonction et on retourne dans la waiting room
+
 }
 
 char *getSalonInfo(SalonDeJeu *salonsDeJeu)
@@ -296,37 +323,49 @@ int testRoom(SalonDeJeu *salonsDeJeu, int choix)
 
 void waitingRoom(SalonDeJeu *salonsDeJeu)
 {
-
-	while(salonsDeJeu->nbJoueur < 2)	//Tant qu'il n'y a pas 2 joueur on attent
+	while(1)	//La salle reste tout le temps en vie
 	{
-		/*
-		*	Ici on attend que un processus de lobby nous envoie un descripteur de socket pour jouer
-			recvf est une fonction pour recevoir un file descriptor
-		*	Ici le read est bloquant
-		*/
+		initFieldSalon(salonsDeJeu);	//Avant chaque nouvelle attente on remet tout à 0;
+		
+		while(salonsDeJeu->nbJoueur < 2)	//Tant qu'il n'y a pas 2 joueur on attent
+		{
+			/*
+			*	Ici on attend que un processus de lobby nous envoie un descripteur de socket pour jouer
+				recvf est une fonction pour recevoir un file descriptor
+			*	Ici le read est bloquant
+			*/
 
-		salonsDeJeu->sockets[salonsDeJeu->nbJoueur] = recvfd(salonsDeJeu->domainReadFromLobby);
+			salonsDeJeu->sockets[salonsDeJeu->nbJoueur] = recvfd(salonsDeJeu->domainReadFromLobby);
 
-		//Une fois qu'on a recu un nouveau joueur on incrémente le nombre de joueur par 1
+			//Une fois qu'on a recu un nouveau joueur on incrémente le nombre de joueur par 1
 
-		salonsDeJeu->nbJoueur += 1;
+			salonsDeJeu->nbJoueur += 1;
 
-		//On signal ensuite on processus père qu'on a un nouveau nombre de joueur
+			//On signal ensuite on processus père qu'on a un nouveau nombre de joueur
 
-		write(salonsDeJeu->pipeWriteToMainProc, &salonsDeJeu->nbJoueur, sizeof(int));
+			write(salonsDeJeu->pipeWriteToMainProc, &salonsDeJeu->nbJoueur, sizeof(int));
+
+		}
+
+		printf("Les deux joueurs sont là, c'est partie !\n");
+
+		handleGame(salonsDeJeu);	//Une fois qu'on a nos 2 joueurs/sockets la partie peut commencer
 
 	}
-
-	printf("Les deux joueurs sont là, c'est partie !\n");
-
-	handleGame(salonsDeJeu);	//Une fois qu'on a nos 2 joueurs/sockets la partie peu commencer
 }
 
 void handleLobby(SalonDeJeu *salonsDeJeu, int domainWriteSocket[lobbySize][2], int socketTalk)	//Ici les clients choissient leur salon
 {
 	char buffer[LG_MESSAGE];
 	memset(buffer, 0x00, LG_MESSAGE * sizeof(char));
-	int salonChoisi = 0;
+	
+	
+	int salonChoisi = -1919;	
+	
+	/*	De base on met ce chiffre
+	*	Si le client se déconnecte et que ce chiffre est toujours là on sait que c'est car il s'est déconnecté
+	*	On ne met pas -1 car il peut se tromper et mettre -1, dans ce cas on lui redemande un salon
+	*/ 
 
 	do
 	{
@@ -335,6 +374,9 @@ void handleLobby(SalonDeJeu *salonsDeJeu, int domainWriteSocket[lobbySize][2], i
 		read(socketTalk, &salonChoisi, sizeof(int));		//On lit quel salon il a choisi
 
 	}while(testRoom(salonsDeJeu, salonChoisi) == -1);
+
+	if(salonChoisi == -1919)	//Si le joueur s'est déconnecté pendant on détruit le processus
+		exit(-1);
 
 	//On dit on joueur que sa sélection est bonne et qu'il est bien dans le salon
 
@@ -374,13 +416,9 @@ void initSalonsDeJeu(SalonDeJeu *salonsDeJeu, int tubesReadInfo[lobbySize][2], i
 {
 	for(int i = 0; i < lobbySize; ++i)		//On initaliser les salons de jeu et on les lances
 	{
-		salonsDeJeu[i].nbJoueur = 0;
-		salonsDeJeu[i].indiceJoueur = 0;
-		salonsDeJeu[i].sockets[0] = -1;
-		salonsDeJeu[i].sockets[1] = -1;
+		initFieldSalon(&salonsDeJeu[i]);
 		salonsDeJeu[i].pipeWriteToMainProc = tubesReadInfo[i][1];			//On lui passe ce bout de la pipe pour qu'il donne ses infos sur ses états
 		salonsDeJeu[i].domainReadFromLobby = domainWriteSocket[i][0];			//On lui passe ce bout de la pipe pour qu'il puisse récupérer des joueurs
-		fillMatrix(salonsDeJeu[i].matrix);
 		int error;
 		if( (error = fork()) == 0)
 		{

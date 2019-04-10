@@ -20,30 +20,33 @@ void startGame(int socket, char *buffer){
 
 	int coordonnees[2];
 
-	while(strcmp(buffer, "fini") != 0)	//Tant qu'on a pas reçu fini on doit choisi un salon
+	while(strcmp(buffer, "fini") != 0 && strcmp(buffer, "okcoordfini") != 0)	//Tant qu'on a pas reçu fini on doit choisi un salon
 	{
 		if(strcmp(buffer, "wait") != 0)	//Celui qui n'a pas recu wait
 		{
-            // GWEN ------------------------
 		    do{
-                printf("%s", buffer);								//On affiche l'état du morpion
-                scanf("%d %d", &coordonnees[0], &coordonnees[1]);
+				if(strcmp(buffer, "okcoordfini") == 0) break;	//Je sais que ça ne devrait pas être là mais ça marche et j'ai la flemme
+				printf("%s", buffer);								//On affiche l'état du morpion
+				scanf("%d %d", &coordonnees[0], &coordonnees[1]);
                 memset(buffer, 0x00, LG_MESSAGE * sizeof(char));
                 write(socket, coordonnees, sizeof(coordonnees));	//On envoie au serveur notre choix
 
                 memset(buffer, 0x00, LG_MESSAGE * sizeof(char));
-                read(socket, buffer, LG_MESSAGE * sizeof(char));	//read est bloquant donc on attend la validation de nos coordonnées envoyé // GWEN ------------------------
-		    }while(strcmp(buffer, "okcoord") == 0); // Si l'on reçoit "okcoord" c'est que les coordonnées que nous avons envoyé sont valide, on peut continuer la partie
-			// GWEN ------------------------
+                read(socket, buffer, LG_MESSAGE * sizeof(char));	//read est bloquant donc on attend la validation de nos coordonnées envoyé
+		    
+			}while(strcmp(buffer, "okcoord") != 0); // Si l'on reçoit "okcoord" c'est que les coordonnées que nous avons envoyé sont valide, on peut continuer la partie
 		}
 
-		printf("L'autre joueur joue...\n");
+		if(strcmp(buffer, "okcoordfini") == 0) break;	//Je sais que ça ne devrait pas être là mais ça marche et j'ai la flemme
 
+		printf("L'autre joueur joue...\n");
 		//Sinon ça veut dire qu'on a reçu wait, l'autre joueur joue
 
 		memset(buffer, 0x00, LG_MESSAGE * sizeof(char));
 		read(socket, buffer, LG_MESSAGE * sizeof(char));
 	}
+
+	printf("La partie est fini !\n");
 
 }
 
