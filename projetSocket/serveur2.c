@@ -90,6 +90,14 @@ int checkIfWin(char tab[3][3], int NB_LIGNE,char symboleJoueur){
     return 0;
 }
 
+// CHECKER SI LES COORDONNEES ENVOYER SONT BIEN A L'INTERIEUR DE LA MATRIX
+int coordIsNotOk(int coordonnees[2]){
+    for(int i=0; i<coordonnees.size(); i++){
+        if(coordonnees[i] < 0 || coordonnees[i] > 2)
+            return 1;
+    }
+    return 0;
+}
 // --------------------------------------
 // --------------------------------------
 // --------------------------------------
@@ -270,9 +278,18 @@ void handleGame(SalonDeJeu *salonDeJeu)
 
 		memset(buffer2, 0x00, LG_MESSAGE * sizeof(char));
 
-		read(salonDeJeu->sockets[salonDeJeu->indiceJoueur], coordonnees, sizeof(coordonnees));	//On lie les coordonnées envoyés par le client												//On lit ce qu'il a envoyé
 
-		salonDeJeu->matrix[coordonnees[1]][coordonnees[0]] = joueurActuel;	//On indique dans la matrice la lettre mis par le joueur
+		// GWEN ----------------------
+		do{
+            read(salonDeJeu->sockets[salonDeJeu->indiceJoueur], coordonnees, sizeof(coordonnees));	//On lie les coordonnées envoyés par le client												//On lit ce qu'il a envoyé
+        }while(coordIsNotOk(coordonnees))); // On lis la réponse du client TANT QU'IL N'A PAS ENVOYER DE BONNE COORDONNEES
+
+        writeToClient(salonDeJeu->indiceJoueur, "okcoord", buffer1);	//On indique au client qu'il a rentré de bonne coordonnée
+
+        memset(buffer1, 0x00, LG_MESSAGE * sizeof(char));   // On vide bien
+        // GWEN ----------------------
+
+        salonDeJeu->matrix[coordonnees[1]][coordonnees[0]] = joueurActuel;	//On indique dans la matrice la lettre mis par le joueur
 
 		salonDeJeu->indiceJoueur = (salonDeJeu->indiceJoueur + 1) % 2;	//On incrémente et %2 pour alterner 0 1
 
