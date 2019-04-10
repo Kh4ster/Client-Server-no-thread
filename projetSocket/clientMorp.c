@@ -15,7 +15,7 @@ On se passe les buffer de fonction en fonction pour réduire le coût mémoire
 */
 
 void startGame(int socket, char *buffer){
-	
+    memset(buffer, 0x00, LG_MESSAGE * sizeof(char));
 	read(socket, buffer, LG_MESSAGE * sizeof(char));	//read est bloquant donc on attend là de savoir qui commence
 
 	int coordonnees[2];
@@ -24,10 +24,17 @@ void startGame(int socket, char *buffer){
 	{
 		if(strcmp(buffer, "wait") != 0)	//Celui qui n'a pas recu wait
 		{
-			printf("%s", buffer);								//On affiche l'état du morpion
-			scanf("%d %d", &coordonnees[0], &coordonnees[1]);
-			memset(buffer, 0x00, LG_MESSAGE * sizeof(char));
-			write(socket, coordonnees, sizeof(coordonnees));	//On envoie au serveur notre choix
+            // GWEN ------------------------
+		    do{
+                printf("%s", buffer);								//On affiche l'état du morpion
+                scanf("%d %d", &coordonnees[0], &coordonnees[1]);
+                memset(buffer, 0x00, LG_MESSAGE * sizeof(char));
+                write(socket, coordonnees, sizeof(coordonnees));	//On envoie au serveur notre choix
+
+                memset(buffer, 0x00, LG_MESSAGE * sizeof(char));
+                read(socket, buffer, LG_MESSAGE * sizeof(char));	//read est bloquant donc on attend la validation de nos coordonnées envoyé // GWEN ------------------------
+		    }while(strcmp(buffer, "okcoord") == 0); // Si l'on reçoit "okcoord" c'est que les coordonnées que nous avons envoyé sont valide, on peut continuer la partie
+			// GWEN ------------------------
 		}
 
 		printf("L'autre joueur joue...\n");
