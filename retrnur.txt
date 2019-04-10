@@ -1,3 +1,10 @@
 quand marche pas
 -> simplfieir au possible jusqu'à ce que marche puis rajouter jusqu'à ce que plus
 -> tableau bidimensionnel dans fonction bancal
+-> RELIRE POUR ERREUR CONNE
+-> les printf sans \n ne marchait pas ??
+-> eviter de réuitiliser le même buffer aprtout
+-> juste le descripteur socket suffit pas, faut autre chose à apparement (avoir acceuili la socket)
+-> pipe2 pour avoir non bloquant
+-> fcntl pour rendre le read non bloquant
+-> chaque processus à sa file descriptor table

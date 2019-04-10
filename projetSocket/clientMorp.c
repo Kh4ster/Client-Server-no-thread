@@ -18,30 +18,25 @@ void startGame(int socket, char *buffer){
 	
 	read(socket, buffer, LG_MESSAGE * sizeof(char));	//read est bloquant donc on attend là de savoir qui commence
 
-	printf("La partie commence !\n");
-
 	int coordonnees[2];
 
 	while(strcmp(buffer, "fini") != 0)	//Tant qu'on a pas reçu fini on doit choisi un salon
 	{
-		if(strcmp(buffer, "play") == 0)
+		if(strcmp(buffer, "wait") != 0)	//Celui qui n'a pas recu wait
 		{
 			printf("%s", buffer);								//On affiche l'état du morpion
 			scanf("%d %d", &coordonnees[0], &coordonnees[1]);
+			memset(buffer, 0x00, LG_MESSAGE * sizeof(char));
 			write(socket, coordonnees, sizeof(coordonnees));	//On envoie au serveur notre choix
 		}
-		else
-		{
-			printf("L'autre joueur joue...\n");
-		}
-		
+
+		printf("L'autre joueur joue...\n");
 
 		//Sinon ça veut dire qu'on a reçu wait, l'autre joueur joue
 
 		memset(buffer, 0x00, LG_MESSAGE * sizeof(char));
 		read(socket, buffer, LG_MESSAGE * sizeof(char));
 	}
-
 
 }
 
