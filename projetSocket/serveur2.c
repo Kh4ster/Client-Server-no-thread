@@ -20,77 +20,62 @@
 #define LG_MESSAGE 256
 #define lobbySize 1
 
-
-// --------------------------------------
-// --------------------------------------
-// --------------------------------------   LOGIQUE DU MORPION
-// AFFICHAGE DU MORPION EN CONSOLE POUR MOI
-/*void affichage(char tab[3][3]){
-    for(int i=0; i<3; i++){
-        for(int j=0; j<3; j++){
-            printf("%c | ", tab[i][j]);
-        }
-        printf("\n");
-    }
-}
-*/
+/* ---- Logique du morpion  ---- */
 
 // CONVERTIR 3 CHAR EN 1 STRING
 char *convertString(char un, char deux, char trois){
-    int tailleTab = 3;
-    char *str = malloc((tailleTab+1) * sizeof(char));
+
+    char *str = malloc((3+1) * sizeof(char));
 
     str[0] = un;
     str[1] = deux;
     str[2] = trois;
     str[3] = '\0';
 
-//    printf("%s", str);
     return str;
 }
 
 // VERIFIER SI LIGNE REGARDER EST FINI
 int check(char *ligne, char symbole){
-    printf("\n'%s' : ", ligne);
     char *resultatVoulu = convertString(symbole, symbole, symbole); // "XXX" ou "OOO"
 
     if(strcmp(ligne, resultatVoulu) == 0){
-        printf("VOUS AVEZ GAGNER !");
         return 1;
-    }
-    else{
-        printf("Continuer la partie [ ... ]");
+    else
         return 0;
-    }
 }
 
 // PASSE SUR TOUTES LES LIGNES / COLONNES / DIAGONALES
-int checkIfWin(char tab[3][3], int NB_LIGNE,char symboleJoueur){
+int checkIfWin(char tab[3][3], char symboleJoueur){
+
     char *ligne;
 
-    for(int i=0; i<NB_LIGNE; i++){ // ON BOUCLE POUR CHECKER LES LIGNES
+    for(int i=0; i < 3; i++){ // ON BOUCLE POUR CHECKER LES LIGNES
         ligne = convertString(tab[i][0], tab[i][1], tab[i][2]);
         if( check(ligne, symboleJoueur) == 1 )
             return 1;
     }
-    for(int i=0; i<NB_LIGNE; i++){ // ON BOUCLE POUR CHECKER LES COLONNES
+    
+	for(int i=0; i < 3; i++){ // ON BOUCLE POUR CHECKER LES COLONNES
         ligne = convertString(tab[0][i], tab[1][i], tab[2][i]);
         if( check(ligne, symboleJoueur) == 1 )
-            return 2;
+            return 1;
     }
-    // CHECKER DIAGONALE DE HAUT VERS BAS
-    ligne = ligne = convertString(tab[0][0], tab[1][1], tab[2][2]);
+    
+	// CHECKER DIAGONALE DE HAUT VERS BAS
+    ligne = convertString(tab[0][0], tab[1][1], tab[2][2]);
     if( check(ligne, symboleJoueur) == 1 )
-        return 3;
+        return 1;
+   
     // CHECKER DIAGONALE DE BAS VERS HAUT
-    ligne = ligne = convertString(tab[2][0], tab[1][1], tab[0][2]);
+    ligne = convertString(tab[2][0], tab[1][1], tab[0][2]);
     if( check(ligne, symboleJoueur) == 1 )
-        return 4;
+        return 1;
 
     return 0;
 }
 
-// --------------------------------------
+// FIN Logique --------------------------
 // --------------------------------------
 // --------------------------------------
 
@@ -238,19 +223,6 @@ void writeToClient(int socketTalk, char *message, char *buffer){
 	write(socketTalk, buffer, strlen(buffer));
 }
 
-int gameNotOver(SalonDeJeu *salonDeJeu, char symboleJoueur)	//To Code
-{
-    int fin = 0;
-    int NB_LIGNE = 3;
-
-    //affichage(tab);
-
-    fin = checkIfWin(salonDeJeu->matrix, NB_LIGNE, symboleJoueur); // SymboleJoueur = 'O' ou 'X'
-    if(fin != 0)
-        return 0; // WIN :)
-    return 1; // RIEN TROUVER :( DONC gameNotOver is True donc renvoit 1 :)
-}
-
 void handleGame(SalonDeJeu *salonDeJeu)
 {
 	char buffer1[LG_MESSAGE];
@@ -264,7 +236,7 @@ void handleGame(SalonDeJeu *salonDeJeu)
 
 	writeToClient(salonDeJeu->sockets[1], "wait", buffer1);	//On indique au deuxième client qu'il doit attendre
 
-	while(gameNotOver(salonDeJeu, joueurActuel))
+	while(!checkIfWin(salonDeJeu, joueurActuel))
 	{
 		writeToClient(salonDeJeu->sockets[salonDeJeu->indiceJoueur], getFormatedMatrix(salonDeJeu, buffer2), buffer2); //On donne l'état de la matrice au ième joueur
 
