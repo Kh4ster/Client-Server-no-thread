@@ -20,6 +20,80 @@
 #define LG_MESSAGE 256
 #define lobbySize 1
 
+
+// --------------------------------------
+// --------------------------------------
+// --------------------------------------   LOGIQUE DU MORPION
+// AFFICHAGE DU MORPION EN CONSOLE POUR MOI
+/*void affichage(char tab[3][3]){
+    for(int i=0; i<3; i++){
+        for(int j=0; j<3; j++){
+            printf("%c | ", tab[i][j]);
+        }
+        printf("\n");
+    }
+}
+*/
+
+// CONVERTIR 3 CHAR EN 1 STRING
+char *convertString(char un, char deux, char trois){
+    int tailleTab = 3;
+    char *str = malloc((tailleTab+1) * sizeof(char));
+
+    str[0] = un;
+    str[1] = deux;
+    str[2] = trois;
+    str[3] = '\0';
+
+//    printf("%s", str);
+    return str;
+}
+
+// VERIFIER SI LIGNE REGARDER EST FINI
+int check(char *ligne, char symbole){
+    printf("\n'%s' : ", ligne);
+    char *resultatVoulu = convertString(symbole, symbole, symbole); // "XXX" ou "OOO"
+
+    if(strcmp(ligne, resultatVoulu) == 0){
+        printf("VOUS AVEZ GAGNER !");
+        return 1;
+    }
+    else{
+        printf("Continuer la partie [ ... ]");
+        return 0;
+    }
+}
+
+// PASSE SUR TOUTES LES LIGNES / COLONNES / DIAGONALES
+int checkIfWin(char tab[3][3], int NB_LIGNE,char symboleJoueur){
+    char *ligne;
+
+    for(int i=0; i<NB_LIGNE; i++){ // ON BOUCLE POUR CHECKER LES LIGNES
+        ligne = convertString(tab[i][0], tab[i][1], tab[i][2]);
+        if( check(ligne, symboleJoueur) == 1 )
+            return 1;
+    }
+    for(int i=0; i<NB_LIGNE; i++){ // ON BOUCLE POUR CHECKER LES COLONNES
+        ligne = convertString(tab[0][i], tab[1][i], tab[2][i]);
+        if( check(ligne, symboleJoueur) == 1 )
+            return 2;
+    }
+    // CHECKER DIAGONALE DE HAUT VERS BAS
+    ligne = ligne = convertString(tab[0][0], tab[1][1], tab[2][2]);
+    if( check(ligne, symboleJoueur) == 1 )
+        return 3;
+    // CHECKER DIAGONALE DE BAS VERS HAUT
+    ligne = ligne = convertString(tab[2][0], tab[1][1], tab[0][2]);
+    if( check(ligne, symboleJoueur) == 1 )
+        return 4;
+
+    return 0;
+}
+
+// --------------------------------------
+// --------------------------------------
+// --------------------------------------
+
 typedef struct{
 
 	int nbJoueur;
@@ -41,7 +115,7 @@ typedef struct{
 
 /**
  * Code provenant d'internet pour utiliser les domain socket UNIX
- * 
+ *
  * Receives file descriptor using given socket
  *
  * @param socket to be used for fd recepion
@@ -88,7 +162,7 @@ int recvfd(int socket) {
 
 /**
  * Code provenant d'internet pour utiliser les domain socket UNIX
- * 
+ *
  * Sends given file descriptior via given socket
  *
  * @param socket to be used for fd sending
@@ -164,28 +238,36 @@ void writeToClient(int socketTalk, char *message, char *buffer){
 	write(socketTalk, buffer, strlen(buffer));
 }
 
-int gameNotOver(SalonDeJeu *salonDeJeu)	//To Code
+int gameNotOver(SalonDeJeu *salonDeJeu, char symboleJoueur)	//To Code
 {
-	return 1;
+    int fin = 0;
+    int NB_LIGNE = 3;
+
+    //affichage(tab);
+
+    fin = checkIfWin(salonDeJeu->matrix, NB_LIGNE, symboleJoueur); // SymboleJoueur = 'O' ou 'X'
+    if(fin != 0)
+        return 0; // WIN :)
+    return 1; // RIEN TROUVER :( DONC gameNotOver is True donc renvoit 1 :)
 }
 
 void handleGame(SalonDeJeu *salonDeJeu)
 {
-	char buffer1[LG_MESSAGE];	
-	char buffer2[LG_MESSAGE];	
+	char buffer1[LG_MESSAGE];
+	char buffer2[LG_MESSAGE];
 	memset(buffer1, 0x00, LG_MESSAGE * sizeof(char));
 	memset(buffer2, 0x00, LG_MESSAGE * sizeof(char));
 
 	int coordonnees[2];	//Tableau dans lequel on va ranger les coordonnées reçues
 
 	char joueurActuel = 'X';
-	
+
 	writeToClient(salonDeJeu->sockets[1], "wait", buffer1);	//On indique au deuxième client qu'il doit attendre
 
-	while(gameNotOver(salonDeJeu))
+	while(gameNotOver(salonDeJeu, joueurActuel))
 	{
 		writeToClient(salonDeJeu->sockets[salonDeJeu->indiceJoueur], getFormatedMatrix(salonDeJeu, buffer2), buffer2); //On donne l'état de la matrice au ième joueur
-		
+
 		memset(buffer2, 0x00, LG_MESSAGE * sizeof(char));
 
 		read(salonDeJeu->sockets[salonDeJeu->indiceJoueur], coordonnees, sizeof(coordonnees));	//On lie les coordonnées envoyés par le client												//On lit ce qu'il a envoyé
@@ -196,7 +278,7 @@ void handleGame(SalonDeJeu *salonDeJeu)
 
 		joueurActuel = (salonDeJeu->indiceJoueur == 1) ? 'O' : 'X';						//Si c'est au joueur 1, le lettre est maintenant O sinon X
 	}
-
+    printf("Le joueur gagnant est : " +joueurActuel);
 }
 
 char *getSalonInfo(SalonDeJeu *salonsDeJeu)
@@ -228,7 +310,7 @@ void waitingRoom(SalonDeJeu *salonsDeJeu)
 
 	while(salonsDeJeu->nbJoueur < 2)	//Tant qu'il n'y a pas 2 joueur on attent
 	{
-		/* 
+		/*
 		*	Ici on attend que un processus de lobby nous envoie un descripteur de socket pour jouer
 			recvf est une fonction pour recevoir un file descriptor
 		*	Ici le read est bloquant
@@ -237,7 +319,7 @@ void waitingRoom(SalonDeJeu *salonsDeJeu)
 		salonsDeJeu->sockets[salonsDeJeu->nbJoueur] = recvfd(salonsDeJeu->domainReadFromLobby);
 
 		//Une fois qu'on a recu un nouveau joueur on incrémente le nombre de joueur par 1
-		
+
 		salonsDeJeu->nbJoueur += 1;
 
 		//On signal ensuite on processus père qu'on a un nouveau nombre de joueur
@@ -248,14 +330,14 @@ void waitingRoom(SalonDeJeu *salonsDeJeu)
 
 	printf("Les deux joueurs sont là, c'est partie !\n");
 
-	handleGame(salonsDeJeu);	//Une fois qu'on a nos 2 joueurs/sockets la partie peu commencer 
+	handleGame(salonsDeJeu);	//Une fois qu'on a nos 2 joueurs/sockets la partie peu commencer
 }
 
 void handleLobby(SalonDeJeu *salonsDeJeu, int domainWriteSocket[lobbySize][2], int socketTalk)	//Ici les clients choissient leur salon
 {
-	char buffer[LG_MESSAGE]; 
+	char buffer[LG_MESSAGE];
 	memset(buffer, 0x00, LG_MESSAGE * sizeof(char));
-	int salonChoisi = 0;	
+	int salonChoisi = 0;
 
 	do
 	{
@@ -268,7 +350,7 @@ void handleLobby(SalonDeJeu *salonsDeJeu, int domainWriteSocket[lobbySize][2], i
 	//On dit on joueur que sa sélection est bonne et qu'il est bien dans le salon
 
 	writeToClient(socketTalk, "ok", buffer);
-	
+
 	salonsDeJeu[salonChoisi].nbJoueur += 1;	//On incrémente de 1 le nombre de joueur il a choisi
 
 	sendfd(domainWriteSocket[salonChoisi][1], socketTalk);	//On indique au salon de jeu qu'on a un nouveau client pour client
@@ -316,11 +398,11 @@ void initSalonsDeJeu(SalonDeJeu *salonsDeJeu, int tubesReadInfo[lobbySize][2], i
 			handleForkError(error);
 			/*close(tubesReadInfo[i][0]);			//Le père ferme le côté écriture de son côté
 			close(domainWriteSocket[i][0]);		//Et le côté lecture socket de son côté*/
-			
+
 			//On envoie le processus et le salon de jeu dans une fonction où il attendra des joueurs et lancera des parties
 			waitingRoom(&salonsDeJeu[i]);
 		}
-		
+
 		/*close(tubesReadInfo[i][1]);			//Le père ferme le côté écriture de son côté
 		close(domainWriteSocket[i][0]);		//Et le côté lecture socket de son côté*/
 
@@ -338,30 +420,30 @@ int main() {
 	int socketTalk;
 	struct sockaddr_in adresseLocale, adresseDistante;
 	socklen_t longueurAdresse;
-	
+
 	// Creation d'un socket de communication
 	socketListen = socket(AF_INET, SOCK_STREAM, 0);
 	/* 0 indique que l'on utilisera le protocole par defaut associe a SOCK_STREAM soit TCP */
-	
+
 	if(socketListen < 0) {
 		perror("socket");
 		exit(-1);
 	}
 	printf("Socket creee avec succes ! (%d)\n", socketListen);
-	
+
 	// Preparation de l'adresse d'attachement locale
 	longueurAdresse = sizeof(struct sockaddr_in);
 	memset(&adresseLocale, 0x00, longueurAdresse);
 	adresseLocale.sin_family = AF_INET;
 	adresseLocale.sin_addr.s_addr = htonl(INADDR_ANY); // toutes les interfaces locales disponibles
 	adresseLocale.sin_port = htons(PORT);
-	
+
 	if((bind(socketListen, (struct sockaddr *)&adresseLocale, longueurAdresse)) < 0) {
 		perror("bind");
 		exit(-2);
 	}
 	printf("Socket attachee avec succes !\n");
-	
+
 	// On fixe la taille de la file d'attente à 15
 	if(listen(socketListen, 15) < 0) {
 		perror("listen");
@@ -390,18 +472,18 @@ int main() {
 	* -> notre but est de pouvoir acceuillir plusieurs clients en même temps
 	*
 	* Pour communiquer entre les salons de jeu et les lobbys on n'utilise pas des pipes mais des UNIX domain socket
-	* Ainsi on pourra passer les descripteurs de socket en paramètre 
-	* Via les pipes, passer juste la valeur de la socket ne suffit pas pour communiquer avec 
+	* Ainsi on pourra passer les descripteurs de socket en paramètre
+	* Via les pipes, passer juste la valeur de la socket ne suffit pas pour communiquer avec
 	*/
 
 	int tubesReadInfo[lobbySize][2];	//Ce tableau sera utilisé pour actualiser les infos des salons de jeu en gardant un lien avec les processus de salons
-	
+
 	int domainWriteSocket[lobbySize][2];	//Ce tableau sera utilisé pour faire entrer les clients dans les salons de jeu
 
 	/*
 	 *	Pour une raison que j'ignore quand je fais l'initialisation via une fonction
 	 *  Les pipes ne fonctionnent pas
-	*/ 
+	*/
 
 	int error = 0;
 	for(int i = 0; i < lobbySize; ++i)
@@ -416,7 +498,7 @@ int main() {
 
 	initSalonsDeJeu(salonsDeJeu, tubesReadInfo, domainWriteSocket);
 
-	/* 
+	/*
 	*	Une fois que le père a fini d'initaliser les salons de jeu il se met à attendre les clients et à actualiser dès que nécessaire les infos des salons
 	*	Pour se faire on passe la socket en mode non bloquant
 	*/
@@ -438,7 +520,7 @@ int main() {
 			}
 			state = -1;
 		}
-		
+
 		socketTalk = accept(socketListen, (struct sockaddr *)&adresseDistante, &longueurAdresse);	//accept renvoie -1 systématiquement quand le buffer de connexion est vide
 
 		if(socketTalk != -1)	//Si un client a été acceuilli
@@ -452,7 +534,7 @@ int main() {
 
 		//Le père continue à lire l'état des tubes et à acceullir des clients si nécessaire
 	}
-	
+
 	// Fermeture de la socket d'ecoute
 	close(socketListen);
 	return EXIT_SUCCESS;
