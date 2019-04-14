@@ -76,11 +76,13 @@ int checkIfWin(char tab[3][3], char symboleJoueur){
 }
 
 // CHECKER SI LES COORDONNEES ENVOYER SONT BIEN A L'INTERIEUR DE LA MATRIX
-int coordIsNotOk(int coordonnees[2]){
+int coordIsNotOk(int coordonnees[2], char tab[3][3]){
     for(int i = 0; i < 2; i++){
         if(coordonnees[i] < 0 || coordonnees[i] > 2)
             return 1;
     }
+    if(tab[coordonnees[0]][coordonnees[1]] != ' ')
+    	return 1;
     return 0;
 }
 // --------------------------------------
@@ -265,7 +267,7 @@ void handleGame(SalonDeJeu *salonDeJeu)
 			
 			read(salonDeJeu->sockets[salonDeJeu->indiceJoueur], coordonnees, sizeof(coordonnees));	//On lie les coordonnées envoyés par le client
 		
-		}while(coordIsNotOk(coordonnees)); 
+		}while(coordIsNotOk(coordonnees, salonDeJeu->matrix)); 
 
         writeToClient(salonDeJeu->sockets[salonDeJeu->indiceJoueur], "okcoord", buffer1);	//On indique au client qu'il a rentré de bonne coordonnée
 
